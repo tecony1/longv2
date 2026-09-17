@@ -103,7 +103,21 @@ function startHealthServer() {
 // ---- Main loop ------------------------------------------------------------
 
 async function fetchAssetStates() {
-  const res = await fetch(API_URL);
+  const res = await fetch(API_URL, {
+    headers: {
+      'Accept': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://app.long.xyz/',
+      'Origin': 'https://app.long.xyz',
+    },
+  });
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text();
+    throw new Error(`Expected JSON but got "${contentType}" (status ${res.status}). First 200 chars: ${text.slice(0, 200)}`);
+  }
+
   const body = await res.json();
   if (!res.ok) {
     throw new Error(`${res.status}: request failed`);
