@@ -23,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { fetch as undiciFetch, ProxyAgent } from 'undici';
 
 // ---- Config -----------------------------------------------------------
 
@@ -36,6 +37,20 @@ const TELEGRAM_CHAT_IDS = (process.env.TELEGRAM_CHAT_ID || 'YOUR_CHAT_ID_HERE')
 
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 5_000);
 const PORT = process.env.PORT || 8000;
+
+// Optional residential proxy — required because api.long.xyz's WAF blocks
+// plain datacenter-IP traffic (the kind Railway/Render/etc use) with a 403.
+// Format: http://username:password@proxy-host:port (get this from your
+// proxy provider, e.g. DataImpulse, Evomi, IPRoyal).
+const PROXY_URL = process.env.PROXY_URL || null;
+const proxyAgent = PROXY_URL ? new ProxyAgent(PROXY_URL) : null;
+
+async function proxiedFetch(url, options = {}) {
+  if (proxyAgent) {
+    return undiciFetch(url, { ...options, dispatcher: proxyAgent });
+  }
+  return fetch(url, options); // falls through to plain fetch if no proxy configured
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATE_FILE = path.join(__dirname, 'longxyz-known-tickers.json');
@@ -103,7 +118,7 @@ function startHealthServer() {
 // ---- Main loop ------------------------------------------------------------
 
 async function fetchAssetStates() {
-  const res = await fetch(API_URL, {
+  const res = await proxiedFetch(API_URL, {
     headers: {
       'Accept': 'application/json',
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -164,6 +179,7 @@ async function tick(seen, isFirstRun) {
 async function main() {
   console.log('Long.xyz new-stock-pair watcher (API-based) starting...');
   console.log(`Polling ${API_URL} every ${POLL_INTERVAL_MS / 1000}s`);
+  console.log(proxyAgent ? '[init] Using residential proxy for requests.' : '[warn] No PROXY_URL set — requests will likely be blocked (403) by api.long.xyz\'s bot protection.');
 
   startHealthServer();
 
