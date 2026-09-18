@@ -289,6 +289,15 @@ async function tick(provider, contract, state) {
       continue;
     }
 
+    // Log every launch we see, not just new-stock ones — lets you cross-check
+    // against app.long.xyz's own recent-launches feed to confirm we're
+    // reading the right contract/events.
+    console.log(
+      `  [launch][longxyz:airlock=${AIRLOCK_ADDRESS}] "${ev.args.name}" asset=${ev.args.asset} creator=${ev.args.creator} ` +
+      `numeraire=${numeraire} tx=${ev.transactionHash} ` +
+      `verify: https://robinhoodchain.blockscout.com/tx/${ev.transactionHash}`
+    );
+
     if (state.numeraires.has(numeraire)) continue;
 
     state.numeraires.add(numeraire);
@@ -303,6 +312,7 @@ async function tick(provider, contract, state) {
       symbol ? `Ticker: *${symbol}*` : null,
       `Numeraire address: \`${numeraire}\``,
       `First seen via launch: *${ev.args.name}* (\`${ev.args.asset}\`)`,
+      `Verify: https://robinhoodchain.blockscout.com/tx/${ev.transactionHash}`,
     ].filter(Boolean).join('\n');
 
     await sendTelegramMessage(text);
